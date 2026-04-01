@@ -102,3 +102,4 @@ jobs:
         action: "upload"
         app_location: "/"
         output_location: "playwright-report"
+        skip_app_build: true
