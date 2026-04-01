@@ -22,6 +22,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
+      contents: write
       pages: write
       id-token: write
     environment:
@@ -92,7 +93,7 @@ jobs:
       if: always()
       uses: actions/upload-pages-artifact@v3
       with:
-        path: playwright-report/
+        path: reports/
 
     - name: Deploy to GitHub Pages
       if: always()
