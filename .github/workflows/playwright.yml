@@ -7,16 +7,15 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
     inputs:
-      test_type:
-        description: 'Select test suite to run'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - smoke
-          - regression
-          - performance
+      smoke:
+        type: boolean
+        default: false
+      regression:
+        type: boolean
+        default: false
+      performance:
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -34,27 +33,44 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
+
     - name: Install dependencies
       run: npm ci
+
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
 
     - name: Run Playwright tests
       run: |
-        TEST_TYPE="${{ github.event.inputs.test_type || 'all' }}"
-        echo "Selected test type: $TEST_TYPE"
+        echo "Smoke: ${{ github.event.inputs.smoke }}"
+        echo "Regression: ${{ github.event.inputs.regression }}"
+        echo "Performance: ${{ github.event.inputs.performance }}"
 
-        if [ "$TEST_TYPE" = "smoke" ]; then
-          npx playwright test tests/S_Smoke
-        elif [ "$TEST_TYPE" = "regression" ]; then
-          npx playwright test tests/S_Regression
-        elif [ "$TEST_TYPE" = "performance" ]; then
-          npx playwright test tests/S_Performance
-        else
+        TEST_PATHS=""
+
+        if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
+          TEST_PATHS="$TEST_PATHS tests/S_Smoke"
+        fi
+
+        if [ "${{ github.event.inputs.regression }}" == "true" ]; then
+          TEST_PATHS="$TEST_PATHS tests/S_Regression"
+        fi
+
+        if [ "${{ github.event.inputs.performance }}" == "true" ]; then
+          TEST_PATHS="$TEST_PATHS tests/S_Performance"
+        fi
+
+        # Si no seleccionan nada, corre todo
+        if [ -z "$TEST_PATHS" ]; then
+          echo "No specific suite selected → running ALL tests"
           npx playwright test
+        else
+          echo "Running selected suites: $TEST_PATHS"
+          npx playwright test $TEST_PATHS
         fi
 
     - uses: actions/upload-artifact@v4
@@ -83,31 +99,4 @@ jobs:
       id: deployment
       uses: actions/deploy-pages@v4
 
-    - name: Set report folder
-      run: |
-        REPORT_NAME="report-${{ github.run_number }}"
-        echo "REPORT_NAME=$REPORT_NAME" >> $GITHUB_ENV
-
-    - name: Prepare report folder
-      run: |
-        mkdir -p reports/$REPORT_NAME
-        cp -r playwright-report/* reports/$REPORT_NAME/
-
-    - name: Deploy to Azure Static Web App
-      if: always()
-      uses: Azure/static-web-apps-deploy@v1
-      with:
-        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        action: "upload"
-        app_location: "playwright-report"
-        output_location: ""
-        skip_app_build: true
-
-    - name: Show report URLs
-      if: always()
-      run: |
-        echo "## 🔎 Test Reports" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- GitHub Pages: https://renecortez.github.io/Playwright/" >> $GITHUB_STEP_SUMMARY
-        echo "- Azure Static Web App: https://delightful-flower-00ed6ab10.1.azurestaticapps.net" >> $GITHUB_STEP_SUMMARY
+      
