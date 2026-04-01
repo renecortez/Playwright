@@ -103,3 +103,11 @@ jobs:
         app_location: "playwright-report"
         output_location: ""
         skip_app_build: true
+
+    - name: Show report URLs
+      if: always()
+      run: |
+        echo "## 🔎 Test Reports" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- GitHub Pages: https://renecortez.github.io/Playwright/" >> $GITHUB_STEP_SUMMARY
+        echo "- Azure Static Web App: https://delightful-flower-00ed6ab10.1.azurestaticapps.net" >> $GITHUB_STEP_SUMMARY
