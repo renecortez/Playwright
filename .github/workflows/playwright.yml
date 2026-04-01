@@ -20,8 +20,11 @@ on:
 
 jobs:
   test:
-    timeout-minutes: 70
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     env:
       CI: true
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -64,3 +67,13 @@ jobs:
         name: test-results
         path: test-results/
         if-no-files-found: ignore
+
+    - name: Upload Playwright Report for Pages
+      if: always()
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: playwright-report/
+
+    - name: Deploy to GitHub Pages
+      if: always()
+      uses: actions/deploy-pages@v4
