@@ -99,4 +99,69 @@ jobs:
       id: deployment
       uses: actions/deploy-pages@v4
 
-      
+    - name: Save reports by suite
+      if: always()
+      run: |
+        REPORT_ID="run-${{ github.run_number }}"
+        echo "Saving reports with ID: $REPORT_ID"
+
+        mkdir -p reports
+
+        if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
+          mkdir -p reports/smoke/$REPORT_ID
+          cp -r playwright-report/* reports/smoke/$REPORT_ID/
+        fi
+
+        if [ "${{ github.event.inputs.regression }}" == "true" ]; then
+          mkdir -p reports/regression/$REPORT_ID
+          cp -r playwright-report/* reports/regression/$REPORT_ID/
+        fi
+
+        if [ "${{ github.event.inputs.performance }}" == "true" ]; then
+          mkdir -p reports/performance/$REPORT_ID
+          cp -r playwright-report/* reports/performance/$REPORT_ID/
+        fi
+
+        # Si no seleccionaron nada → guardar como "all"
+        if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
+          [ "${{ github.event.inputs.regression }}" != "true" ] && \
+          [ "${{ github.event.inputs.performance }}" != "true" ]; then
+          mkdir -p reports/all/$REPORT_ID
+          cp -r playwright-report/* reports/all/$REPORT_ID/
+        fi
+
+    - name: Commit reports to repo
+      if: always()
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "actions@github.com"
+
+        git add reports/
+        git commit -m "Add test report ${{ github.run_number }}" || echo "No changes to commit"
+        git push
+
+    - name: Generate dashboard index
+      if: always()
+      run: |
+        echo "Generating dashboard..."
+
+        mkdir -p reports
+
+        INDEX_FILE="reports/index.html"
+
+        echo "<html><head><title>QA Reports</title></head><body>" > $INDEX_FILE
+        echo "<h1>QA Test Reports</h1>" >> $INDEX_FILE
+
+        for SUITE in smoke regression performance all; do
+          if [ -d "reports/$SUITE" ]; then
+            echo "<h2>${SUITE^}</h2><ul>" >> $INDEX_FILE
+
+            for RUN in $(ls reports/$SUITE | sort -r); do
+              echo "<li><a href=\"./$SUITE/$RUN/index.html\">$RUN</a></li>" >> $INDEX_FILE
+            done
+
+            echo "</ul>" >> $INDEX_FILE
+          fi
+        done
+
+        echo "</body></html>" >> $INDEX_FILE
