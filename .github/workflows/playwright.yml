@@ -65,7 +65,6 @@ jobs:
           TEST_PATHS="$TEST_PATHS tests/S_Performance"
         fi
 
-        # Si no seleccionan nada, corre todo
         if [ -z "$TEST_PATHS" ]; then
           echo "No specific suite selected → running ALL tests"
           npx playwright test
@@ -73,32 +72,6 @@ jobs:
           echo "Running selected suites: $TEST_PATHS"
           npx playwright test $TEST_PATHS
         fi
-
-    - uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: playwright-report
-        path: playwright-report/
-        retention-days: 30
-
-    - name: Upload test results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-results
-        path: test-results/
-        if-no-files-found: ignore
-
-    - name: Upload Playwright Report for Pages
-      if: always()
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: reports/
-
-    - name: Deploy to GitHub Pages
-      if: always()
-      id: deployment
-      uses: actions/deploy-pages@v4
 
     - name: Save reports by suite
       if: always()
@@ -123,30 +96,17 @@ jobs:
           cp -r playwright-report/* reports/performance/$REPORT_ID/
         fi
 
-        # Si no seleccionaron nada → guardar como "all"
         if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
-          [ "${{ github.event.inputs.regression }}" != "true" ] && \
-          [ "${{ github.event.inputs.performance }}" != "true" ]; then
+           [ "${{ github.event.inputs.regression }}" != "true" ] && \
+           [ "${{ github.event.inputs.performance }}" != "true" ]; then
           mkdir -p reports/all/$REPORT_ID
           cp -r playwright-report/* reports/all/$REPORT_ID/
         fi
-
-    - name: Commit reports to repo
-      if: always()
-      run: |
-        git config --global user.name "github-actions"
-        git config --global user.email "actions@github.com"
-
-        git add reports/
-        git commit -m "Add test report ${{ github.run_number }}" || echo "No changes to commit"
-        git push
 
     - name: Generate dashboard index
       if: always()
       run: |
         echo "Generating dashboard..."
-
-        mkdir -p reports
 
         INDEX_FILE="reports/index.html"
 
@@ -166,3 +126,32 @@ jobs:
         done
 
         echo "</body></html>" >> $INDEX_FILE
+
+    - name: Commit reports to repo
+      if: always()
+      run: |
+        git config --global user.name "github-actions"
+        git config --global user.email "actions@github.com"
+
+        git add reports/
+        git commit -m "Add test report ${{ github.run_number }}" || echo "No changes to commit"
+        git push
+
+    - name: Upload Playwright Report for Pages
+      if: always()
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: reports
+
+    - name: Deploy to GitHub Pages
+      if: always()
+      id: deployment
+      uses: actions/deploy-pages@v4
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: test-results/
+        if-no-files-found: ignore
