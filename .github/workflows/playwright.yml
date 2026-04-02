@@ -10,7 +10,7 @@ on:
   #pull_request:
   #  branches: [ main, master ]
   # ----------------------------
-    
+
   # This would trigger the workflow automatically on:
   # - Every push to main/master
   # - Every pull request
@@ -70,7 +70,7 @@ jobs:
         echo "Performance: ${{ github.event.inputs.performance }}"
 
         TEST_PATHS=""
-        STATUS="PASS"
+        STATUS="UNKNOWN"
 
         if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
           TEST_PATHS="$TEST_PATHS tests/S_Smoke"
@@ -86,13 +86,23 @@ jobs:
 
         if [ -z "$TEST_PATHS" ]; then
           echo "Running ALL tests"
-          npx playwright test || STATUS="FAIL"
+          npx playwright test
         else
           echo "Running: $TEST_PATHS"
-          npx playwright test $TEST_PATHS || STATUS="FAIL"
+          npx playwright test $TEST_PATHS
         fi
 
-        echo "STATUS=${STATUS:-UNKNOWN}" >> $GITHUB_ENV
+        EXIT_CODE=$?
+
+        if [ $EXIT_CODE -eq 0 ]; then
+          STATUS="PASS"
+        else
+          STATUS="FAIL"
+        fi
+
+        echo "STATUS=$STATUS" >> $GITHUB_ENV
+
+        exit $EXIT_CODE
 
     # -------------------------
     # SAVE REPORTS
@@ -147,7 +157,7 @@ jobs:
         echo '<html>' > $INDEX_FILE
         echo '<head>' >> $INDEX_FILE
         echo '<meta charset="UTF-8">' >> $INDEX_FILE
-        echo '<title>QA Dashboard</title>' >> $INDEX_FILE
+        echo '<title>Automation Test Results</title>' >> $INDEX_FILE
         echo '<style>' >> $INDEX_FILE
         echo 'body { font-family: Arial; background:#0f172a; color:white; }' >> $INDEX_FILE
         echo 'h1 { text-align:center; }' >> $INDEX_FILE
@@ -159,7 +169,7 @@ jobs:
         echo '</style>' >> $INDEX_FILE
         echo '</head>' >> $INDEX_FILE
         echo '<body>' >> $INDEX_FILE
-        echo '<h1>QA Test Dashboard</h1>' >> $INDEX_FILE
+        echo '<h1>Automation Test Results</h1>' >> $INDEX_FILE
 
         for SUITE in smoke regression performance all; do
           if ls reports/$SUITE/run-* 1> /dev/null 2>&1; then
