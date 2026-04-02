@@ -112,16 +112,19 @@ jobs:
           cp -r playwright-report/* reports/all/$REPORT_ID/
         fi
         
-    - name: Generate dashboard index
-      run: |
-        INDEX_FILE="reports/index.html"
+        - name: Generate dashboard index
+          if: always()
+          run: |
+            INDEX_FILE="reports/index.html"
 
-        echo "<html>
+            cat <<EOF > $INDEX_FILE
+        <html>
         <head>
           <title>QA Dashboard</title>
           <style>
             body { font-family: Arial; background:#0f172a; color:white; }
             h1 { text-align:center; }
+            h2 { margin-top:30px; }
             .card {
               background:#1e293b;
               padding:15px;
@@ -134,40 +137,47 @@ jobs:
           </style>
         </head>
         <body>
-        <h1>QA Test Dashboard</h1>" > $INDEX_FILE
+        <h1>QA Test Dashboard</h1>
+        EOF
 
-        for SUITE in smoke regression performance all; do
-          if [ -d "reports/$SUITE" ]; then
-            echo "<h2>$SUITE</h2>" >> $INDEX_FILE
+            for SUITE in smoke regression performance all; do
+              if [ -d "reports/$SUITE" ]; then
+                echo "<h2>$SUITE</h2>" >> $INDEX_FILE
 
-            for RUN in $(ls reports/$SUITE | sort -r); do
-              META="reports/$SUITE/$RUN/meta.json"
+                for RUN in $(ls reports/$SUITE | sort -r); do
+                  META="reports/$SUITE/$RUN/meta.json"
 
-              if [ -f "$META" ]; then
-                STATUS=$(cat $META | grep status | cut -d '"' -f4)
-                DATE=$(cat $META | grep date | cut -d '"' -f4)
-              else
-                STATUS="UNKNOWN"
-                DATE="N/A"
+                  if [ -f "$META" ]; then
+                    STATUS=$(cat $META | grep status | cut -d '"' -f4)
+                    DATE=$(cat $META | grep date | cut -d '"' -f4)
+                  else
+                    STATUS="UNKNOWN"
+                    DATE="N/A"
+                  fi
+
+                  CLASS="pass"
+                  if [ "$STATUS" = "FAIL" ]; then
+                    CLASS="fail"
+                  fi
+
+                  cat <<EOF >> $INDEX_FILE
+        <div class='card'>
+          <b>$RUN</b><br>
+          📅 $DATE<br>
+          Status: <span class='$CLASS'>$STATUS</span><br>
+          <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
+        </div>
+        EOF
+
+                done
               fi
-
-              CLASS="pass"
-              if [ "$STATUS" = "FAIL" ]; then
-                CLASS="fail"
-              fi
-
-              echo "<div class='card'>
-                <b>$RUN</b><br>
-                📅 $DATE<br>
-                Status: <span class='$CLASS'>$STATUS</span><br>
-                <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
-              </div>" >> $INDEX_FILE
-
             done
-          fi
-        done
 
-    echo "</body></html>" >> $INDEX_FILE
+            cat <<EOF >> $INDEX_FILE
+        </body>
+        </html>
+        EOF
+
 
     - name: Commit reports to repo
       if: always()
