@@ -100,7 +100,7 @@ jobs:
           SUITE=$1
           mkdir -p reports/$SUITE/$REPORT_ID
           cp -r playwright-report/* reports/$SUITE/$REPORT_ID/ 2>/dev/null || true
-          DATE=$(date +"%Y-%m-%d_%H-%M-%S")
+          DATE=$(date +"%Y-%m-%d %H:%M:%S")
           printf '{"status":"%s","date":"%s"}\n' "${STATUS:-UNKNOWN}" "$DATE" > reports/$SUITE/$REPORT_ID/meta.json
         }
 
@@ -160,7 +160,7 @@ jobs:
 
               if [ -f "$META" ]; then
                 STATUS=$(grep status $META | cut -d '"' -f4)
-                DATE=$(grep date $META | cut -d '"' -f4)
+                DATE=$(grep '"date"' $META | cut -d '"' -f4)
               else
                 STATUS="UNKNOWN"
                 DATE="N/A"
@@ -173,7 +173,7 @@ jobs:
 
               echo "<div class='card'>" >> $INDEX_FILE
               echo "<b>$RUN</b><br>" >> $INDEX_FILE
-              echo "📅 $DATE<br>" >> $INDEX_FILE
+              echo "Date: $DATE<br>" >> $INDEX_FILE
               echo "Status: <span class='$CLASS'>$STATUS</span><br>" >> $INDEX_FILE
               echo "<a href='./$SUITE/$RUN/index.html'>Ver reporte</a>" >> $INDEX_FILE
               echo "</div>" >> $INDEX_FILE
