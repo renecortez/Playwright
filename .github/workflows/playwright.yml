@@ -88,21 +88,21 @@ jobs:
           mkdir -p reports/smoke/$REPORT_ID
           cp -r playwright-report/* reports/smoke/$REPORT_ID/
           DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-          cat <<EOF > reports/smoke/$REPORT_ID/meta.json {"status": "$STATUS","date": "$DATE"}
+          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/smoke/$REPORT_ID/meta.json
         fi
 
         if [ "${{ github.event.inputs.regression }}" == "true" ]; then
           mkdir -p reports/regression/$REPORT_ID
           cp -r playwright-report/* reports/regression/$REPORT_ID/
           DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-          cat <<EOF > reports/regression/$REPORT_ID/meta.json {"status": "$STATUS","date": "$DATE"}
+          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/regression/$REPORT_ID/meta.json
         fi
 
         if [ "${{ github.event.inputs.performance }}" == "true" ]; then
           mkdir -p reports/performance/$REPORT_ID
           cp -r playwright-report/* reports/performance/$REPORT_ID/
           DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-          cat <<EOF > reports/performance/$REPORT_ID/meta.json {"status": "$STATUS","date": "$DATE"}
+          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/performance/$REPORT_ID/meta.json
         fi
 
         if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
