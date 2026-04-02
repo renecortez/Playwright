@@ -21,20 +21,23 @@ jobs:
   test:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
       pages: write
       id-token: write
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     env:
       CI: true
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
     - uses: actions/checkout@v4
-    
+
     - uses: actions/setup-node@v4
       with:
         node-version: lts/*
@@ -68,10 +71,10 @@ jobs:
 
         if [ -z "$TEST_PATHS" ]; then
           echo "No specific suite selected → running ALL tests"
-          npx playwright test
+          npx playwright test || STATUS="FAIL"
         else
           echo "Running selected suites: $TEST_PATHS"
-          npx playwright test $TEST_PATHS
+          npx playwright test $TEST_PATHS || STATUS="FAIL"
         fi
 
         echo "STATUS=$STATUS" >> $GITHUB_ENV
@@ -84,40 +87,38 @@ jobs:
 
         mkdir -p reports
 
-        if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
-          mkdir -p reports/smoke/$REPORT_ID
-          cp -r playwright-report/* reports/smoke/$REPORT_ID/
+        save_report () {
+          SUITE=$1
+          mkdir -p reports/$SUITE/$REPORT_ID
+          cp -r playwright-report/* reports/$SUITE/$REPORT_ID/
           DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/smoke/$REPORT_ID/meta.json
+          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/$SUITE/$REPORT_ID/meta.json
+        }
+
+        if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
+          save_report "smoke"
         fi
 
         if [ "${{ github.event.inputs.regression }}" == "true" ]; then
-          mkdir -p reports/regression/$REPORT_ID
-          cp -r playwright-report/* reports/regression/$REPORT_ID/
-          DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/regression/$REPORT_ID/meta.json
+          save_report "regression"
         fi
 
         if [ "${{ github.event.inputs.performance }}" == "true" ]; then
-          mkdir -p reports/performance/$REPORT_ID
-          cp -r playwright-report/* reports/performance/$REPORT_ID/
-          DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/performance/$REPORT_ID/meta.json
+          save_report "performance"
         fi
 
         if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
            [ "${{ github.event.inputs.regression }}" != "true" ] && \
            [ "${{ github.event.inputs.performance }}" != "true" ]; then
-          mkdir -p reports/all/$REPORT_ID
-          cp -r playwright-report/* reports/all/$REPORT_ID/
+          save_report "all"
         fi
 
-        - name: Generate dashboard index
-          if: always()
-          run: |
-            INDEX_FILE="reports/index.html"
+    - name: Generate dashboard index
+      if: always()
+      run: |
+        INDEX_FILE="reports/index.html"
 
-            cat <<EOF > $INDEX_FILE
+        cat <<EOF > $INDEX_FILE
         <html>
         <head>
           <title>QA Dashboard</title>
@@ -140,44 +141,43 @@ jobs:
         <h1>QA Test Dashboard</h1>
         EOF
 
-            for SUITE in smoke regression performance all; do
-              if [ -d "reports/$SUITE" ]; then
-                echo "<h2>$SUITE</h2>" >> $INDEX_FILE
+        for SUITE in smoke regression performance all; do
+          if [ -d "reports/$SUITE" ]; then
+            echo "<h2>$SUITE</h2>" >> $INDEX_FILE
 
-                for RUN in $(ls reports/$SUITE | sort -r); do
-                  META="reports/$SUITE/$RUN/meta.json"
+            for RUN in $(ls reports/$SUITE | sort -r); do
+              META="reports/$SUITE/$RUN/meta.json"
 
-                  if [ -f "$META" ]; then
-                    STATUS=$(cat $META | grep status | cut -d '"' -f4)
-                    DATE=$(cat $META | grep date | cut -d '"' -f4)
-                  else
-                    STATUS="UNKNOWN"
-                    DATE="N/A"
-                  fi
-
-                  CLASS="pass"
-                  if [ "$STATUS" = "FAIL" ]; then
-                    CLASS="fail"
-                  fi
-
-                  cat <<EOF >> $INDEX_FILE
-        <div class='card'>
-          <b>$RUN</b><br>
-          📅 $DATE<br>
-          Status: <span class='$CLASS'>$STATUS</span><br>
-          <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
-        </div>
-        EOF
-
-                done
+              if [ -f "$META" ]; then
+                STATUS=$(grep status $META | cut -d '"' -f4)
+                DATE=$(grep date $META | cut -d '"' -f4)
+              else
+                STATUS="UNKNOWN"
+                DATE="N/A"
               fi
-            done
 
-            cat <<EOF >> $INDEX_FILE
+              CLASS="pass"
+              if [ "$STATUS" = "FAIL" ]; then
+                CLASS="fail"
+              fi
+
+              cat <<EOF >> $INDEX_FILE
+            <div class='card'>
+              <b>$RUN</b><br>
+              📅 $DATE<br>
+              Status: <span class='$CLASS'>$STATUS</span><br>
+              <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
+            </div>
+            EOF
+
+            done
+          fi
+        done
+
+        cat <<EOF >> $INDEX_FILE
         </body>
         </html>
         EOF
-
 
     - name: Commit reports to repo
       if: always()
