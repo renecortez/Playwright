@@ -107,16 +107,24 @@ jobs:
           save_report "performance"
         fi
 
-        if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
-           [ "${{ github.event.inputs.regression }}" != "true" ] && \
-           [ "${{ github.event.inputs.performance }}" != "true" ]; then
+        # fallback SIEMPRE
+        if [ "${{ github.event_name }}" != "workflow_dispatch" ] || \
+           { [ "${{ github.event.inputs.smoke }}" != "true" ] && \
+             [ "${{ github.event.inputs.regression }}" != "true" ] && \
+             [ "${{ github.event.inputs.performance }}" != "true" ]; }; then
           save_report "all"
         fi
+
+        echo "===== REPORTS STRUCTURE ====="
+        ls -R reports
 
     - name: Generate dashboard index
       if: always()
       run: |
         INDEX_FILE="reports/index.html"
+
+        echo "Checking available suites..."
+        ls reports || echo "No reports found"
 
         cat <<EOF > $INDEX_FILE
         <html>
@@ -141,11 +149,11 @@ jobs:
         <h1>QA Test Dashboard</h1>
         EOF
 
-        for SUITE in smoke regression performance all; do
+        for SUITE in $(ls reports); do
           if [ -d "reports/$SUITE" ]; then
             echo "<h2>$SUITE</h2>" >> $INDEX_FILE
 
-            for RUN in $(ls reports/$SUITE | sort -r); do
+            for RUN in $(ls reports/$SUITE 2>/dev/null | sort -r); do
               META="reports/$SUITE/$RUN/meta.json"
 
               if [ -f "$META" ]; then
@@ -162,14 +170,13 @@ jobs:
               fi
 
               cat <<EOF >> $INDEX_FILE
-            <div class='card'>
-              <b>$RUN</b><br>
-              📅 $DATE<br>
-              Status: <span class='$CLASS'>$STATUS</span><br>
-              <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
-            </div>
-            EOF
-
+              <div class='card'>
+                <b>$RUN</b><br>
+                📅 $DATE<br>
+                Status: <span class='$CLASS'>$STATUS</span><br>
+                <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
+              </div>
+              EOF
             done
           fi
         done
