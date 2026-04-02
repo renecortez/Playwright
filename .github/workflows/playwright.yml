@@ -52,6 +52,7 @@ jobs:
         echo "Performance: ${{ github.event.inputs.performance }}"
 
         TEST_PATHS=""
+        STATUS="PASS"
 
         if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
           TEST_PATHS="$TEST_PATHS tests/S_Smoke"
@@ -73,6 +74,8 @@ jobs:
           npx playwright test $TEST_PATHS
         fi
 
+        echo "STATUS=$STATUS" >> $GITHUB_ENV
+
     - name: Save reports by suite
       if: always()
       run: |
@@ -84,16 +87,22 @@ jobs:
         if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
           mkdir -p reports/smoke/$REPORT_ID
           cp -r playwright-report/* reports/smoke/$REPORT_ID/
+          DATE=$(date '+%Y-%m-%d %H:%M:%S')
+          echo "{\"status\": \"$STATUS\",\"date\": \"$DATE\"}" > reports/smoke/$REPORT_ID/meta.json
         fi
 
         if [ "${{ github.event.inputs.regression }}" == "true" ]; then
           mkdir -p reports/regression/$REPORT_ID
           cp -r playwright-report/* reports/regression/$REPORT_ID/
+          DATE=$(date '+%Y-%m-%d %H:%M:%S')
+          echo "{\"status\": \"$STATUS\",\"date\": \"$DATE\"}" > reports/regression/$REPORT_ID/meta.json
         fi
 
         if [ "${{ github.event.inputs.performance }}" == "true" ]; then
           mkdir -p reports/performance/$REPORT_ID
           cp -r playwright-report/* reports/performance/$REPORT_ID/
+          DATE=$(date '+%Y-%m-%d %H:%M:%S')
+          echo "{\"status\": \"$STATUS\",\"date\": \"$DATE\"}" > reports/performance/$REPORT_ID/meta.json
         fi
 
         if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
@@ -102,30 +111,63 @@ jobs:
           mkdir -p reports/all/$REPORT_ID
           cp -r playwright-report/* reports/all/$REPORT_ID/
         fi
-
+        
     - name: Generate dashboard index
-      if: always()
       run: |
-        echo "Generating dashboard..."
-
         INDEX_FILE="reports/index.html"
 
-        echo "<html><head><title>QA Reports</title></head><body>" > $INDEX_FILE
-        echo "<h1>QA Test Reports</h1>" >> $INDEX_FILE
+        echo "<html>
+        <head>
+          <title>QA Dashboard</title>
+          <style>
+            body { font-family: Arial; background:#0f172a; color:white; }
+            h1 { text-align:center; }
+            .card {
+              background:#1e293b;
+              padding:15px;
+              margin:10px;
+              border-radius:10px;
+            }
+            .pass { color:#22c55e; }
+            .fail { color:#ef4444; }
+            a { color:#38bdf8; text-decoration:none; }
+          </style>
+        </head>
+        <body>
+        <h1>QA Test Dashboard</h1>" > $INDEX_FILE
 
         for SUITE in smoke regression performance all; do
           if [ -d "reports/$SUITE" ]; then
-            echo "<h2>${SUITE^}</h2><ul>" >> $INDEX_FILE
+            echo "<h2>$SUITE</h2>" >> $INDEX_FILE
 
             for RUN in $(ls reports/$SUITE | sort -r); do
-              echo "<li><a href=\"./$SUITE/$RUN/index.html\">$RUN</a></li>" >> $INDEX_FILE
-            done
+              META="reports/$SUITE/$RUN/meta.json"
 
-            echo "</ul>" >> $INDEX_FILE
+              if [ -f "$META" ]; then
+                STATUS=$(cat $META | grep status | cut -d '"' -f4)
+                DATE=$(cat $META | grep date | cut -d '"' -f4)
+              else
+                STATUS="UNKNOWN"
+                DATE="N/A"
+              fi
+
+              CLASS="pass"
+              if [ "$STATUS" = "FAIL" ]; then
+                CLASS="fail"
+              fi
+
+              echo "<div class='card'>
+                <b>$RUN</b><br>
+                📅 $DATE<br>
+                Status: <span class='$CLASS'>$STATUS</span><br>
+                <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
+              </div>" >> $INDEX_FILE
+
+            done
           fi
         done
 
-        echo "</body></html>" >> $INDEX_FILE
+    echo "</body></html>" >> $INDEX_FILE
 
     - name: Commit reports to repo
       if: always()
