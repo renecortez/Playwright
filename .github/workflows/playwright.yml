@@ -34,6 +34,8 @@ jobs:
     env:
       CI: true
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
 
     steps:
     - uses: actions/checkout@v4
@@ -80,7 +82,7 @@ jobs:
           npx playwright test $TEST_PATHS || STATUS="FAIL"
         fi
 
-        echo "STATUS=$STATUS" >> $GITHUB_ENV
+        echo "STATUS=${STATUS:-UNKNOWN}" >> $GITHUB_ENV
 
     # -------------------------
     # SAVE REPORTS
@@ -88,6 +90,7 @@ jobs:
     - name: Save reports by suite
       if: always()
       run: |
+        STATUS="$STATUS"
         REPORT_ID="run-${{ github.run_number }}"
         echo "Saving reports with ID: $REPORT_ID"
 
@@ -96,9 +99,9 @@ jobs:
         save_report () {
           SUITE=$1
           mkdir -p reports/$SUITE/$REPORT_ID
-          cp -r playwright-report/* reports/$SUITE/$REPORT_ID/
+          cp -r playwright-report/* reports/$SUITE/$REPORT_ID/ 2>/dev/null || true
           DATE=$(date +"%Y-%m-%d_%H-%M-%S")
-          printf '{"status":"%s","date":"%s"}\n' "$STATUS" "$DATE" > reports/$SUITE/$REPORT_ID/meta.json
+          printf '{"status":"%s","date":"%s"}\n' "${STATUS:-UNKNOWN}" "$DATE" > reports/$SUITE/$REPORT_ID/meta.json
         }
 
         if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
@@ -133,6 +136,7 @@ jobs:
         # HTML HEADER
         echo '<html>' > $INDEX_FILE
         echo '<head>' >> $INDEX_FILE
+        echo '<meta charset="UTF-8">' >> $INDEX_FILE
         echo '<title>QA Dashboard</title>' >> $INDEX_FILE
         echo '<style>' >> $INDEX_FILE
         echo 'body { font-family: Arial; background:#0f172a; color:white; }' >> $INDEX_FILE
@@ -148,10 +152,10 @@ jobs:
         echo '<h1>QA Test Dashboard</h1>' >> $INDEX_FILE
 
         for SUITE in smoke regression performance all; do
-          if [ -d "reports/$SUITE" ]; then
+          if ls reports/$SUITE/run-* 1> /dev/null 2>&1; then
             echo "<h2>$SUITE</h2>" >> $INDEX_FILE
 
-            for RUN in $(ls reports/$SUITE | sort -r); do
+            for RUN in $(ls -d reports/$SUITE/run-* 2>/dev/null | xargs -n1 basename | sort -r); do
               META="reports/$SUITE/$RUN/meta.json"
 
               if [ -f "$META" ]; then
