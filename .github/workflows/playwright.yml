@@ -48,6 +48,9 @@ jobs:
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
 
+    # -------------------------
+    # RUN TESTS
+    # -------------------------
     - name: Run Playwright tests
       run: |
         echo "Smoke: ${{ github.event.inputs.smoke }}"
@@ -70,15 +73,18 @@ jobs:
         fi
 
         if [ -z "$TEST_PATHS" ]; then
-          echo "No specific suite selected → running ALL tests"
+          echo "Running ALL tests"
           npx playwright test || STATUS="FAIL"
         else
-          echo "Running selected suites: $TEST_PATHS"
+          echo "Running: $TEST_PATHS"
           npx playwright test $TEST_PATHS || STATUS="FAIL"
         fi
 
         echo "STATUS=$STATUS" >> $GITHUB_ENV
 
+    # -------------------------
+    # SAVE REPORTS
+    # -------------------------
     - name: Save reports by suite
       if: always()
       run: |
@@ -96,64 +102,56 @@ jobs:
         }
 
         if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
-          save_report "smoke"
+          save_report smoke
         fi
 
         if [ "${{ github.event.inputs.regression }}" == "true" ]; then
-          save_report "regression"
+          save_report regression
         fi
 
         if [ "${{ github.event.inputs.performance }}" == "true" ]; then
-          save_report "performance"
+          save_report performance
         fi
 
-        # fallback SIEMPRE
-        if [ "${{ github.event_name }}" != "workflow_dispatch" ] || \
-           { [ "${{ github.event.inputs.smoke }}" != "true" ] && \
-             [ "${{ github.event.inputs.regression }}" != "true" ] && \
-             [ "${{ github.event.inputs.performance }}" != "true" ]; }; then
-          save_report "all"
+        if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
+           [ "${{ github.event.inputs.regression }}" != "true" ] && \
+           [ "${{ github.event.inputs.performance }}" != "true" ]; then
+          save_report all
         fi
 
-        echo "===== REPORTS STRUCTURE ====="
-        ls -R reports
-
+    # -------------------------
+    # GENERATE DASHBOARD
+    # -------------------------
     - name: Generate dashboard index
       if: always()
       run: |
         INDEX_FILE="reports/index.html"
 
         echo "Checking available suites..."
-        ls reports || echo "No reports found"
+        ls -R reports || true
 
-        cat <<EOF > $INDEX_FILE
-        <html>
-        <head>
-          <title>QA Dashboard</title>
-          <style>
-            body { font-family: Arial; background:#0f172a; color:white; }
-            h1 { text-align:center; }
-            h2 { margin-top:30px; }
-            .card {
-              background:#1e293b;
-              padding:15px;
-              margin:10px;
-              border-radius:10px;
-            }
-            .pass { color:#22c55e; }
-            .fail { color:#ef4444; }
-            a { color:#38bdf8; text-decoration:none; }
-          </style>
-        </head>
-        <body>
-        <h1>QA Test Dashboard</h1>
-        EOF
+        # HTML HEADER
+        echo '<html>' > $INDEX_FILE
+        echo '<head>' >> $INDEX_FILE
+        echo '<title>QA Dashboard</title>' >> $INDEX_FILE
+        echo '<style>' >> $INDEX_FILE
+        echo 'body { font-family: Arial; background:#0f172a; color:white; }' >> $INDEX_FILE
+        echo 'h1 { text-align:center; }' >> $INDEX_FILE
+        echo 'h2 { margin-top:30px; }' >> $INDEX_FILE
+        echo '.card { background:#1e293b; padding:15px; margin:10px; border-radius:10px; }' >> $INDEX_FILE
+        echo '.pass { color:#22c55e; }' >> $INDEX_FILE
+        echo '.fail { color:#ef4444; }' >> $INDEX_FILE
+        echo 'a { color:#38bdf8; text-decoration:none; }' >> $INDEX_FILE
+        echo '</style>' >> $INDEX_FILE
+        echo '</head>' >> $INDEX_FILE
+        echo '<body>' >> $INDEX_FILE
+        echo '<h1>QA Test Dashboard</h1>' >> $INDEX_FILE
 
-        for SUITE in $(ls reports); do
+        for SUITE in smoke regression performance all; do
           if [ -d "reports/$SUITE" ]; then
             echo "<h2>$SUITE</h2>" >> $INDEX_FILE
 
-            for RUN in $(ls reports/$SUITE 2>/dev/null | sort -r); do
+            for RUN in $(ls reports/$SUITE | sort -r); do
               META="reports/$SUITE/$RUN/meta.json"
 
               if [ -f "$META" ]; then
@@ -169,23 +167,22 @@ jobs:
                 CLASS="fail"
               fi
 
-              cat <<EOF >> $INDEX_FILE
-              <div class='card'>
-                <b>$RUN</b><br>
-                📅 $DATE<br>
-                Status: <span class='$CLASS'>$STATUS</span><br>
-                <a href='./$SUITE/$RUN/index.html'>Ver reporte</a>
-              </div>
-              EOF
+              echo "<div class='card'>" >> $INDEX_FILE
+              echo "<b>$RUN</b><br>" >> $INDEX_FILE
+              echo "📅 $DATE<br>" >> $INDEX_FILE
+              echo "Status: <span class='$CLASS'>$STATUS</span><br>" >> $INDEX_FILE
+              echo "<a href='./$SUITE/$RUN/index.html'>Ver reporte</a>" >> $INDEX_FILE
+              echo "</div>" >> $INDEX_FILE
             done
           fi
         done
 
-        cat <<EOF >> $INDEX_FILE
-        </body>
-        </html>
-        EOF
+        echo '</body>' >> $INDEX_FILE
+        echo '</html>' >> $INDEX_FILE
 
+    # -------------------------
+    # COMMIT REPORTS
+    # -------------------------
     - name: Commit reports to repo
       if: always()
       run: |
@@ -193,10 +190,13 @@ jobs:
         git config --global user.email "actions@github.com"
 
         git add reports/
-        git commit -m "Add test report ${{ github.run_number }}" || echo "No changes to commit"
+        git commit -m "Add test report ${{ github.run_number }}" || echo "No changes"
         git push
 
-    - name: Upload Playwright Report for Pages
+    # -------------------------
+    # DEPLOY PAGES
+    # -------------------------
+    - name: Upload Pages Artifact
       if: always()
       uses: actions/upload-pages-artifact@v3
       with:
@@ -207,6 +207,9 @@ jobs:
       id: deployment
       uses: actions/deploy-pages@v4
 
+    # -------------------------
+    # ARTIFACTS
+    # -------------------------
     - name: Upload test results
       if: always()
       uses: actions/upload-artifact@v4
