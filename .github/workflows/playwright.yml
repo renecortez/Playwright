@@ -1,10 +1,20 @@
 name: Playwright Tests
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  # AUTO TRIGGERS (DISABLED)
+  # Uncomment below to enable automatic execution:
+
+  # ----------------------------
+  #push:
+  #  branches: [ main, master ]
+  #pull_request:
+  #  branches: [ main, master ]
+  # ----------------------------
+    
+  # This would trigger the workflow automatically on:
+  # - Every push to main/master
+  # - Every pull request
+
   workflow_dispatch:
     inputs:
       smoke:
