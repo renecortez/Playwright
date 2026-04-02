@@ -87,22 +87,22 @@ jobs:
         if [ "${{ github.event.inputs.smoke }}" == "true" ]; then
           mkdir -p reports/smoke/$REPORT_ID
           cp -r playwright-report/* reports/smoke/$REPORT_ID/
-          DATE=$(date '+%Y-%m-%d %H:%M:%S')
-          echo "{\"status\": \"$STATUS\",\"date\": \"$DATE\"}" > reports/smoke/$REPORT_ID/meta.json
+          DATE=$(date +"%Y-%m-%d_%H-%M-%S")
+          cat <<EOF > reports/smoke/$REPORT_ID/meta.json {"status": "$STATUS","date": "$DATE"}
         fi
 
         if [ "${{ github.event.inputs.regression }}" == "true" ]; then
           mkdir -p reports/regression/$REPORT_ID
           cp -r playwright-report/* reports/regression/$REPORT_ID/
-          DATE=$(date '+%Y-%m-%d %H:%M:%S')
-          echo "{\"status\": \"$STATUS\",\"date\": \"$DATE\"}" > reports/regression/$REPORT_ID/meta.json
+          DATE=$(date +"%Y-%m-%d_%H-%M-%S")
+          cat <<EOF > reports/regression/$REPORT_ID/meta.json {"status": "$STATUS","date": "$DATE"}
         fi
 
         if [ "${{ github.event.inputs.performance }}" == "true" ]; then
           mkdir -p reports/performance/$REPORT_ID
           cp -r playwright-report/* reports/performance/$REPORT_ID/
-          DATE=$(date '+%Y-%m-%d %H:%M:%S')
-          echo "{\"status\": \"$STATUS\",\"date\": \"$DATE\"}" > reports/performance/$REPORT_ID/meta.json
+          DATE=$(date +"%Y-%m-%d_%H-%M-%S")
+          cat <<EOF > reports/performance/$REPORT_ID/meta.json {"status": "$STATUS","date": "$DATE"}
         fi
 
         if [ "${{ github.event.inputs.smoke }}" != "true" ] && \
@@ -111,7 +111,7 @@ jobs:
           mkdir -p reports/all/$REPORT_ID
           cp -r playwright-report/* reports/all/$REPORT_ID/
         fi
-        
+
         - name: Generate dashboard index
           if: always()
           run: |
