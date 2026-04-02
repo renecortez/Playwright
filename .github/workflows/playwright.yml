@@ -159,8 +159,8 @@ jobs:
               META="reports/$SUITE/$RUN/meta.json"
 
               if [ -f "$META" ]; then
-                STATUS=$(grep status $META | cut -d '"' -f4)
-                DATE=$(grep '"date"' $META | cut -d '"' -f4)
+                STATUS=$(cut -d '"' -f4 $META)
+                DATE=$(cut -d '"' -f8 $META)
               else
                 STATUS="UNKNOWN"
                 DATE="N/A"
